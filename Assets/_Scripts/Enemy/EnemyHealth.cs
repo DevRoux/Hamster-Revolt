@@ -1,6 +1,7 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.SceneManagement;
 
 public class EnemyHealth : MonoBehaviour
 {
@@ -9,6 +10,7 @@ public class EnemyHealth : MonoBehaviour
 
     public TMP_Text enemyHealthText;
     public UnityEvent onDeath;
+    public GameObject BossDeathWinTrigger;
 
     private void Awake()
     {
@@ -49,7 +51,10 @@ public class EnemyHealth : MonoBehaviour
         {
             onDeath.Invoke();
         }
-
+        if (BossDeathWinTrigger.activeSelf)
+        {
+            SceneManager.LoadScene("GameOverWin");
+        }
         Destroy(gameObject);
     }
 }
