@@ -46,6 +46,7 @@ public class EnemyHealth : MonoBehaviour
     private void Die()
     {
         Debug.Log("Enemy died!");
+        Destroy(gameObject);
 
         if (onDeath != null)
         {
@@ -55,6 +56,5 @@ public class EnemyHealth : MonoBehaviour
         {
             SceneManager.LoadScene("GameOverWin");
         }
-        Destroy(gameObject);
     }
 }
