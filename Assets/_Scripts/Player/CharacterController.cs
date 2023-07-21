@@ -4,45 +4,32 @@ using UnityEngine.SceneManagement;
 
 public class CharacterController : MonoBehaviour
 {
-    // Custom variables
     public float moveSpeed = 5f;
-    public float rotationSpeed = 10f;
     public float attackDistance = 2f;
     public int minDamage = 2;
     public int maxDamage = 4;
     public float attackDelay = 0.5f;
     public float pushbackForce = 2f;
+    public int maxHealth = 10;
+    public TMP_Text playerHealthText;
 
     private Rigidbody2D rb;
+    private Animator animator;
     private bool isAttacking;
     private float attackTimer;
     private bool isInvulnerable;
     private float invulnerabilityTime;
-    private SpriteRenderer spriteRenderer;
-    private Sprite originalSprite;
-    public Sprite damagedSprite;
-    public Sprite attackingSprite;
-    public float spriteChangeDuration = 0.5f;
 
-    // Health system
-    public int maxHealth = 10;
-    public int currentHealth;
-    public TMP_Text playerHealthText;
+    private int currentHealth;
 
-    // Movement system
+    public Vector2 lastInputDirection = Vector2.right;
     private string horizontalAxis = "Horizontal";
     private string verticalAxis = "Vertical";
-
-    // Attack system
     private string attackButton = "Attack";
 
-    // Ranged attack system
-    public GameObject bulletPrefab;
-    public int bulletDamage = 2;
-    public float shotDelay = 1f;
-    private float shotTimer;
+    private ShootController shootController;
+    public bool IsAttacking => isAttacking;
 
-    // Audio system
     public AudioClip damageSound;
     public AudioClip attackSound;
     public AudioClip fireSound;
@@ -51,16 +38,16 @@ public class CharacterController : MonoBehaviour
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
-        spriteRenderer = GetComponent<SpriteRenderer>();
-        originalSprite = spriteRenderer.sprite;
+        animator = GetComponent<Animator>();
+        shootController = GetComponent<ShootController>();
     }
 
     private void Start()
     {
+        rb.freezeRotation = true;
         currentHealth = maxHealth;
         UpdatePlayerHealthText();
         attackTimer = 0f;
-        shotTimer = 0f;
         invulnerabilityTime = 0f;
     }
 
@@ -69,10 +56,17 @@ public class CharacterController : MonoBehaviour
         float moveX = Input.GetAxisRaw(horizontalAxis);
         float moveY = Input.GetAxisRaw(verticalAxis);
 
-        Vector2 movement = new Vector2(moveX, moveY).normalized * moveSpeed;
-
-        rb.velocity = movement;
-        //RotateTowardsMouse();
+        if (moveX != 0f || moveY != 0f)
+        {
+            lastInputDirection = new Vector2(moveX, moveY).normalized;
+            rb.velocity = lastInputDirection * moveSpeed;
+            animator.SetFloat("MoveX", lastInputDirection.x);
+            animator.SetFloat("MoveY", lastInputDirection.y);
+        }
+        else
+        {
+            rb.velocity = Vector2.zero; // Set velocity to zero when no input
+        }
 
         if (Input.GetButtonDown(attackButton) && !isAttacking && attackTimer <= 0f)
         {
@@ -80,15 +74,9 @@ public class CharacterController : MonoBehaviour
             attackTimer = attackDelay;
         }
 
-        if (Input.GetButtonDown("Fire") && !isAttacking && shotTimer <= 0f)
+        if (Input.GetButtonDown("Fire") && !isAttacking)
         {
-            Shoot();
-            shotTimer = shotDelay;
-        }
-
-        if (shotTimer > 0f)
-        {
-            shotTimer -= Time.deltaTime;
+            shootController.Shoot(lastInputDirection);
         }
 
         if (isInvulnerable)
@@ -98,7 +86,7 @@ public class CharacterController : MonoBehaviour
             if (invulnerabilityTime <= 0)
             {
                 isInvulnerable = false;
-                spriteRenderer.sprite = originalSprite;
+                animator.SetBool("Damaged", false);
             }
         }
 
@@ -108,20 +96,11 @@ public class CharacterController : MonoBehaviour
         }
     }
 
-    private void RotateTowardsMouse()
-    {
-        // Look at the mouse position
-        Vector3 mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-        Vector2 direction = mousePosition - transform.position;
-        float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
-        rb.rotation = angle;
-    }
-
     private System.Collections.IEnumerator PerformAttack()
     {
         isAttacking = true;
 
-        Vector2 attackDirection = transform.right;
+        Vector2 attackDirection = lastInputDirection;
         RaycastHit2D[] hits = Physics2D.RaycastAll(transform.position, attackDirection, attackDistance);
 
         foreach (RaycastHit2D hit in hits)
@@ -133,20 +112,18 @@ public class CharacterController : MonoBehaviour
                 {
                     int damage = Random.Range(minDamage, maxDamage + 1);
                     enemyHealth.TakeDamage(damage);
-
-                    // Push back the enemy
                     PushEnemyBack(hit.collider.gameObject, attackDirection);
                 }
             }
         }
 
-        StartCoroutine(ChangeSpriteForDuration(attackingSprite, spriteChangeDuration));
-
         PlaySound(attackSound);
 
-        isAttacking = false;
+        yield return new WaitForSeconds(attackDelay);
 
-        yield return null;
+        isAttacking = false; // Reset the isAttacking flag
+
+        // Rest of the logic
     }
 
     private void PushEnemyBack(GameObject enemy, Vector2 attackDirection)
@@ -155,24 +132,15 @@ public class CharacterController : MonoBehaviour
         if (enemyRB != null)
         {
             Vector2 pushbackDirection = -attackDirection.normalized;
-
             enemyRB.AddForce(pushbackDirection * pushbackForce, ForceMode2D.Impulse);
         }
-    }
-
-    private void Shoot()
-    {
-        GameObject bullet = Instantiate(bulletPrefab, transform.position, transform.rotation);
-        Bullet bulletScript = bullet.GetComponent<Bullet>();
-        bulletScript.damage = bulletDamage;
-
-        PlaySound(fireSound);
     }
 
     public void TakeDamage(int damage)
     {
         if (!isInvulnerable)
         {
+            animator.SetBool("Damaged", true);
             currentHealth -= damage;
 
             if (currentHealth <= 0)
@@ -183,9 +151,6 @@ public class CharacterController : MonoBehaviour
             {
                 isInvulnerable = true;
                 invulnerabilityTime = 2f;
-                StartCoroutine(ChangeSpriteForDuration(damagedSprite, spriteChangeDuration));
-
-                PlaySound(damageSound);
             }
         }
         UpdatePlayerHealthText();
@@ -195,15 +160,6 @@ public class CharacterController : MonoBehaviour
     {
         currentHealth = Mathf.Min(currentHealth + amount, maxHealth);
         UpdatePlayerHealthText();
-    }
-
-    private System.Collections.IEnumerator ChangeSpriteForDuration(Sprite newSprite, float duration)
-    {
-        spriteRenderer.sprite = newSprite;
-
-        yield return new WaitForSeconds(duration);
-
-        spriteRenderer.sprite = originalSprite;
     }
 
     private void Die()

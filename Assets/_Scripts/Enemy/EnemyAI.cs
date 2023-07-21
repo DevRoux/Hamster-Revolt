@@ -20,6 +20,7 @@ public class EnemyAI : MonoBehaviour
     private GameObject player;
     private bool isFrozen;
     private Rigidbody2D rb;
+    private Vector2[] directions = { Vector2.up, Vector2.down, Vector2.left, Vector2.right };
 
     private void Start()
     {
@@ -53,8 +54,8 @@ public class EnemyAI : MonoBehaviour
                     }
                     else
                     {
-                        Vector2 direction = (player.transform.position - transform.position).normalized;
-                        rb.MovePosition(rb.position + direction * moveSpeed * Time.deltaTime);
+                        Vector2 directionToPlayer = (player.transform.position - transform.position).normalized;
+                        MoveInFourDirections(directionToPlayer);
                     }
                     break;
 
@@ -64,6 +65,25 @@ public class EnemyAI : MonoBehaviour
                     break;
             }
         }
+    }
+
+    private void MoveInFourDirections(Vector2 targetDirection)
+    {
+        float maxDot = -Mathf.Infinity;
+        int closestDirectionIndex = 0;
+
+        for (int i = 0; i < directions.Length; i++)
+        {
+            float dot = Vector2.Dot(targetDirection, directions[i]);
+            if (dot > maxDot)
+            {
+                maxDot = dot;
+                closestDirectionIndex = i;
+            }
+        }
+
+        Vector2 chosenDirection = directions[closestDirectionIndex];
+        rb.MovePosition(rb.position + chosenDirection * moveSpeed * Time.deltaTime);
     }
 
     public void Freeze(float duration)

@@ -9,7 +9,6 @@ public class CharacterAnimationController : MonoBehaviour
     public Rigidbody2D myRB;
     private Vector2 moveDirection;
     private Vector2 lastMoveDirection;
-    private float moveSpeed = 1;
     private enum MovementState {Walk,LeftWalk,DownWalk,Attack,LeftAttack,DownAttack,Idle,LeftIdle,DownIdle }
 
     // Start is called before the first frame update
